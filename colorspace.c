@@ -10,10 +10,13 @@
 #include <time.h>
 
 #define NUM_ITERATIONS 1000
+#define ALGO_C 0
+#define ALGO_NEON 1
+
 
 int get_file_size(char *name);
 long elapsed_msec(struct timespec *start, struct timespec *end); 
-void run_tests(int count, int size, unsigned char *in, unsigned char *out);
+void run_tests(int count, int algo, int size, unsigned char *in, unsigned char *out);
 void c_yuy2_to_uyvy(int size, unsigned char *in, unsigned char *out);
 void neon_yuy2_to_uyvy(int size, unsigned char *in, unsigned char *out);
 
@@ -63,7 +66,7 @@ int main(int argc, char **argv)
 
 	memset(out, 0, size);
 
-	run_tests(NUM_ITERATIONS, size, in, out);
+	run_tests(NUM_ITERATIONS, ALGO_C, size, in, out);
 
 done:
 	if (in)
@@ -77,7 +80,7 @@ done:
 	return 0;	
 }
 
-void run_tests(int count, int size, unsigned char *in, unsigned char *out)
+void run_tests(int count, int algo, int size, unsigned char *in, unsigned char *out)
 {
 	struct timespec start, end;
 	int i;
@@ -88,8 +91,14 @@ void run_tests(int count, int size, unsigned char *in, unsigned char *out)
 		return;
 	}
 
-	for (i = 0; i < count; i++)
-		c_yuy2_to_uyvy(size, in, out);
+	if (algo == ALGO_C) {
+		for (i = 0; i < count; i++)
+			c_yuy2_to_uyvy(size, in, out);
+	}
+	else {
+		for (i = 0; i < count; i++)
+			neon_yuy2_to_uyvy(size, in, out);
+	}
 
 	if (clock_gettime(CLOCK_MONOTONIC, &end)) {
 		perror("clock_gettime");
@@ -117,6 +126,10 @@ void c_yuy2_to_uyvy(int size, unsigned char *in, unsigned char *out)
 		out[i+2] = in[i+3];
 		out[i+3] = in[i+2];		
 	}
+}
+
+void neon_yuy2_to_uyvy(int size, unsigned char *in, unsigned char *out)
+{
 }
 
 long elapsed_msec(struct timespec *start, struct timespec *end)
