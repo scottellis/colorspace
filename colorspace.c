@@ -9,16 +9,17 @@
 #include <unistd.h>
 #include <time.h>
 
+#include <arm_neon.h>
+
 #define NUM_ITERATIONS 1000
 #define ALGO_C 0
 #define ALGO_NEON 1
-
 
 int get_file_size(char *name);
 long elapsed_msec(struct timespec *start, struct timespec *end); 
 void run_tests(int count, int algo, int size, unsigned char *in, unsigned char *out);
 void c_yuy2_to_uyvy(int size, unsigned char *in, unsigned char *out);
-void neon_yuy2_to_uyvy(int size, unsigned char *in, unsigned char *out);
+void neon_yuy2_to_uyvy(int size, unsigned char *in, unsigned char * __restrict out);
 
 int main(int argc, char **argv)
 {
@@ -66,7 +67,7 @@ int main(int argc, char **argv)
 
 	memset(out, 0, size);
 
-	run_tests(NUM_ITERATIONS, ALGO_C, size, in, out);
+	run_tests(NUM_ITERATIONS, ALGO_NEON, size, in, out);
 
 done:
 	if (in)
@@ -94,8 +95,7 @@ void run_tests(int count, int algo, int size, unsigned char *in, unsigned char *
 	if (algo == ALGO_C) {
 		for (i = 0; i < count; i++)
 			c_yuy2_to_uyvy(size, in, out);
-	}
-	else {
+	} else {
 		for (i = 0; i < count; i++)
 			neon_yuy2_to_uyvy(size, in, out);
 	}
@@ -128,8 +128,21 @@ void c_yuy2_to_uyvy(int size, unsigned char *in, unsigned char *out)
 	}
 }
 
-void neon_yuy2_to_uyvy(int size, unsigned char *in, unsigned char *out)
+void neon_yuy2_to_uyvy(int size, unsigned char *in, unsigned char * __restrict out)
 {
+	int i;
+	uint8x8x4_t iVec;
+//	uint8x8x4_t oVec;
+	unsigned char *oPtr, *iPtr; 
+
+	iPtr = in;
+	oPtr = out;
+	for (i = 0; i < size; i += 8) {
+                iVec = vld4_u8(iPtr);
+                vst4_u8(oPtr, iVec);
+//		iPtr += 8;
+//		oPtr += 8;
+	}
 }
 
 long elapsed_msec(struct timespec *start, struct timespec *end)
@@ -140,7 +153,6 @@ long elapsed_msec(struct timespec *start, struct timespec *end)
 		end->tv_nsec += 1000000000;
 		end->tv_sec--;
 	}
-
 	msec = (end->tv_nsec - start->tv_nsec) / 1000000;
 
 	return ((end->tv_sec - start->tv_sec) * 1000) + msec;
