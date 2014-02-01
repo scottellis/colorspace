@@ -131,17 +131,27 @@ void c_yuy2_to_uyvy(int size, unsigned char *in, unsigned char *out)
 void neon_yuy2_to_uyvy(int size, unsigned char *in, unsigned char * __restrict out)
 {
 	int i;
-	uint8x8x4_t iVec;
-//	uint8x8x4_t oVec;
+	uint8x8_t iVec;
+	uint8x8_t oVec;
+	uint8x8_t mVec = vcreate_u8(0x0607040502030001);
+
 	unsigned char *oPtr, *iPtr; 
 
 	iPtr = in;
 	oPtr = out;
 	for (i = 0; i < size; i += 8) {
-                iVec = vld4_u8(iPtr);
-                vst4_u8(oPtr, iVec);
-//		iPtr += 8;
-//		oPtr += 8;
+                iVec = vld1_u8(iPtr);
+		oVec = vtbl1_u8(iVec, mVec);
+                vst1_u8(oPtr, oVec);
+/*
+printf("In:  %02x %02x %02x %02x %02x %02x %02x %02x\n",
+		iPtr[0], iPtr[1], iPtr[2], iPtr[3], iPtr[4], iPtr[5], iPtr[6], iPtr[7]);
+printf("Out: %02x %02x %02x %02x %02x %02x %02x %02x\n\n",
+                oPtr[0], oPtr[1], oPtr[2], oPtr[3], oPtr[4], oPtr[5], oPtr[6], oPtr[7]);
+*/
+		iPtr += 8;
+		oPtr += 8;
+
 	}
 }
 
