@@ -127,6 +127,37 @@ void c_yuy2_to_uyvy(int size, unsigned char *in, unsigned char *out)
 		out[i+3] = in[i+2];		
 	}
 }
+/*
+void neon_yuy2_to_uyvy(int size, unsigned char *in, unsigned char * __restrict out)
+{
+        int i;
+	uint8x8x4_t iVec;
+        uint8x8x4_t oVec;
+
+        unsigned char *oPtr, *iPtr;
+
+        iPtr = in;
+        oPtr = out;
+        for (i = 0; i < size; i += 32) {
+                iVec = vld4_u8(iPtr);
+                oVec.val[0] = iVec.val[1];
+		oVec.val[1] = iVec.val[0];
+		oVec.val[2] = iVec.val[3];
+		oVec.val[3] = iVec.val[2];
+                vst4_u8(oPtr, oVec);
+
+//printf("In:  %02x %02x %02x %02x %02x %02x %02x %02x\n",
+//                iPtr[0], iPtr[1], iPtr[2], iPtr[3], iPtr[4], iPtr[5], iPtr[6], iPtr[7]);
+//printf("Out: %02x %02x %02x %02x %02x %02x %02x %02x\n\n",
+//                oPtr[0], oPtr[1], oPtr[2], oPtr[3], oPtr[4], oPtr[5], oPtr[6], oPtr[7]);
+
+                iPtr += 32;
+                oPtr += 32;
+
+        }
+}
+*/
+
 
 void neon_yuy2_to_uyvy(int size, unsigned char *in, unsigned char * __restrict out)
 {
@@ -143,17 +174,18 @@ void neon_yuy2_to_uyvy(int size, unsigned char *in, unsigned char * __restrict o
                 iVec = vld1_u8(iPtr);
 		oVec = vtbl1_u8(iVec, mVec);
                 vst1_u8(oPtr, oVec);
-/*
-printf("In:  %02x %02x %02x %02x %02x %02x %02x %02x\n",
-		iPtr[0], iPtr[1], iPtr[2], iPtr[3], iPtr[4], iPtr[5], iPtr[6], iPtr[7]);
-printf("Out: %02x %02x %02x %02x %02x %02x %02x %02x\n\n",
-                oPtr[0], oPtr[1], oPtr[2], oPtr[3], oPtr[4], oPtr[5], oPtr[6], oPtr[7]);
-*/
+
+//printf("In:  %02x %02x %02x %02x %02x %02x %02x %02x\n",
+//		iPtr[0], iPtr[1], iPtr[2], iPtr[3], iPtr[4], iPtr[5], iPtr[6], iPtr[7]);
+//printf("Out: %02x %02x %02x %02x %02x %02x %02x %02x\n\n",
+//                oPtr[0], oPtr[1], oPtr[2], oPtr[3], oPtr[4], oPtr[5], oPtr[6], oPtr[7]);
+
 		iPtr += 8;
 		oPtr += 8;
 
 	}
 }
+
 
 long elapsed_msec(struct timespec *start, struct timespec *end)
 {
