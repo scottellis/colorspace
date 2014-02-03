@@ -9,17 +9,17 @@
 #include <unistd.h>
 #include <time.h>
 
-#include <arm_neon.h>
-
 #define NUM_ITERATIONS 1000
-#define ALGO_C 0
-#define ALGO_NEON 1
 
 int get_file_size(char *name);
 long elapsed_msec(struct timespec *start, struct timespec *end); 
-void run_tests(int count, int algo, int size, unsigned char *in, unsigned char *out);
+void run_tests(int count, int size, unsigned char *in, unsigned char *out);
 void c_yuy2_to_uyvy(int size, unsigned char *in, unsigned char *out);
+
+#ifdef ALGO_NEON
+#include <arm_neon.h>
 void neon_yuy2_to_uyvy(int size, unsigned char *in, unsigned char * __restrict out);
+#endif
 
 int main(int argc, char **argv)
 {
@@ -67,7 +67,7 @@ int main(int argc, char **argv)
 
 	memset(out, 0, size);
 
-	run_tests(NUM_ITERATIONS, ALGO_NEON, size, in, out);
+	run_tests(NUM_ITERATIONS, size, in, out);
 
 done:
 	if (in)
@@ -81,7 +81,7 @@ done:
 	return 0;	
 }
 
-void run_tests(int count, int algo, int size, unsigned char *in, unsigned char *out)
+void run_tests(int count, int size, unsigned char *in, unsigned char *out)
 {
 	struct timespec start, end;
 	int i;
@@ -92,13 +92,13 @@ void run_tests(int count, int algo, int size, unsigned char *in, unsigned char *
 		return;
 	}
 
-	if (algo == ALGO_C) {
-		for (i = 0; i < count; i++)
-			c_yuy2_to_uyvy(size, in, out);
-	} else {
-		for (i = 0; i < count; i++)
-			neon_yuy2_to_uyvy(size, in, out);
-	}
+	for (i = 0; i < count; i++) {
+#ifdef ALGO_NEON
+		neon_yuy2_to_uyvy(size, in, out);
+#else
+		c_yuy2_to_uyvy(size, in, out);
+#endif
+	}	
 
 	if (clock_gettime(CLOCK_MONOTONIC, &end)) {
 		perror("clock_gettime");
@@ -106,6 +106,12 @@ void run_tests(int count, int algo, int size, unsigned char *in, unsigned char *
 	}
 
 	elapsed = elapsed_msec(&start, &end);	
+
+#ifdef ALGO_NEON
+	printf("Algorithm: Neon\n");
+#else
+	printf("Algorithm: C\n");
+#endif
 
 	printf("Iterations: %d\n", count);
 	printf("Elapsed time: %ld ms\n", elapsed);
@@ -127,38 +133,8 @@ void c_yuy2_to_uyvy(int size, unsigned char *in, unsigned char *out)
 		out[i+3] = in[i+2];		
 	}
 }
-/*
-void neon_yuy2_to_uyvy(int size, unsigned char *in, unsigned char * __restrict out)
-{
-        int i;
-	uint8x8x4_t iVec;
-        uint8x8x4_t oVec;
 
-        unsigned char *oPtr, *iPtr;
-
-        iPtr = in;
-        oPtr = out;
-        for (i = 0; i < size; i += 32) {
-                iVec = vld4_u8(iPtr);
-                oVec.val[0] = iVec.val[1];
-		oVec.val[1] = iVec.val[0];
-		oVec.val[2] = iVec.val[3];
-		oVec.val[3] = iVec.val[2];
-                vst4_u8(oPtr, oVec);
-
-//printf("In:  %02x %02x %02x %02x %02x %02x %02x %02x\n",
-//                iPtr[0], iPtr[1], iPtr[2], iPtr[3], iPtr[4], iPtr[5], iPtr[6], iPtr[7]);
-//printf("Out: %02x %02x %02x %02x %02x %02x %02x %02x\n\n",
-//                oPtr[0], oPtr[1], oPtr[2], oPtr[3], oPtr[4], oPtr[5], oPtr[6], oPtr[7]);
-
-                iPtr += 32;
-                oPtr += 32;
-
-        }
-}
-*/
-
-
+#ifdef ALGO_NEON
 void neon_yuy2_to_uyvy(int size, unsigned char *in, unsigned char * __restrict out)
 {
 	int i;
@@ -170,22 +146,26 @@ void neon_yuy2_to_uyvy(int size, unsigned char *in, unsigned char * __restrict o
 
 	iPtr = in;
 	oPtr = out;
+
 	for (i = 0; i < size; i += 8) {
                 iVec = vld1_u8(iPtr);
+
 		oVec = vtbl1_u8(iVec, mVec);
+
                 vst1_u8(oPtr, oVec);
 
-//printf("In:  %02x %02x %02x %02x %02x %02x %02x %02x\n",
-//		iPtr[0], iPtr[1], iPtr[2], iPtr[3], iPtr[4], iPtr[5], iPtr[6], iPtr[7]);
-//printf("Out: %02x %02x %02x %02x %02x %02x %02x %02x\n\n",
-//                oPtr[0], oPtr[1], oPtr[2], oPtr[3], oPtr[4], oPtr[5], oPtr[6], oPtr[7]);
+#ifdef DEBUG
+		printf("In:  %02x %02x %02x %02x %02x %02x %02x %02x\n",
+			iPtr[0], iPtr[1], iPtr[2], iPtr[3], iPtr[4], iPtr[5], iPtr[6], iPtr[7]);
+		printf("Out: %02x %02x %02x %02x %02x %02x %02x %02x\n\n",
+			oPtr[0], oPtr[1], oPtr[2], oPtr[3], oPtr[4], oPtr[5], oPtr[6], oPtr[7]);
+#endif
 
 		iPtr += 8;
 		oPtr += 8;
-
 	}
 }
-
+#endif
 
 long elapsed_msec(struct timespec *start, struct timespec *end)
 {
@@ -195,6 +175,7 @@ long elapsed_msec(struct timespec *start, struct timespec *end)
 		end->tv_nsec += 1000000000;
 		end->tv_sec--;
 	}
+
 	msec = (end->tv_nsec - start->tv_nsec) / 1000000;
 
 	return ((end->tv_sec - start->tv_sec) * 1000) + msec;
